@@ -1,0 +1,424 @@
+package com.demirkol.bitkideneyi;
+
+import static com.demirkol.bitkideneyi.R.string.bitkisulaniyor;
+
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+
+import android.app.ProgressDialog;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.os.Handler;
+import android.util.Log;
+import android.view.View;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
+import android.widget.Button;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import com.demirkol.bitkideneyi.databinding.ActivityAnasayfaBinding;
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.FullScreenContentCallback;
+import com.google.android.gms.ads.LoadAdError;
+import com.google.android.gms.ads.OnUserEarnedRewardListener;
+import com.google.android.gms.ads.interstitial.InterstitialAd;
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
+import com.google.android.gms.ads.rewarded.RewardItem;
+import com.google.android.gms.ads.rewarded.RewardedAd;
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
+public class Anasayfa extends AppCompatActivity implements View.OnClickListener {
+    private static final String PREF_NAME = "MyPrefs";
+    private static final String KEY_LAST_LOGIN_DATE = "lastLoginDate";
+    ActivityAnasayfaBinding binding;
+    TextView txtToplamSoru;
+    RewardedAd mrewardedAd;
+    TextView txtSoru;
+    String currentDate;
+    Button btnCevapA,btnCevapB,btnCevapC,btnCevapD;
+    Button btnGonder;
+    int puan=0;
+    Veriokuma veri;
+    int soru_sayisi=1;
+    SoruCevap soruCevap;
+    int toplamSoru=4;
+    int sorulacak=0,gelenveridegeri;
+    InterstitialAd minterstitialAd;
+    String secilenCevap="";
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        binding = ActivityAnasayfaBinding.inflate(getLayoutInflater());
+        View view = binding.getRoot();
+        setContentView(view);
+        binding.girisEkrani.setVisibility(View.VISIBLE);
+        binding.soruEkrani.setVisibility(View.INVISIBLE);
+        binding.sonucEkrani.setVisibility(View.INVISIBLE);
+        btnCevapA=findViewById(R.id.sorular_btn_bir);
+        btnCevapB=findViewById(R.id.sorular_btn_iki);
+        btnCevapC=findViewById(R.id.sorular_btn_uc);
+
+        // Son giriş tarihini al
+        String lastLoginDate = getLastLoginDate();
+        SoruCevap2 soruCevap2=new SoruCevap2(this);
+        soruCevap2.verilerial();
+      odullureklamyukleme();
+
+        // Şu anki tarihi al
+        currentDate = getCurrentDate();
+        soruCevap = new SoruCevap(this); // SoruCevap sınıfından bir örnek oluşturuldu
+
+        soruCevap.verilerial(); // verilerial() metodu çağrıldı
+        toprakdegerinemi();
+
+        binding.sorucoz.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent= new Intent(Anasayfa.this,Eglencesoru.class);
+                startActivity(intent);
+
+            }
+        });
+
+        // Son giriş tarihiyle şu anki tarih karşılaştırılır
+        if (!currentDate.equals(lastLoginDate)) {
+            // Eğer son giriş tarihi ve şu anki tarih farklı ise, kullanıcı bugün ilk kez giriş yapıyor demektir
+            // Burada giriş işlemleri gerçekleştirilir
+            performLoginActions();
+
+            // Son giriş tarihini güncelle
+
+        } else {
+            // Eğer son giriş tarihi ve şu anki tarih aynı ise, kullanıcı bugün zaten giriş yapmış demektir
+            // Bu durumda kullanıcıya bir kez giriş yapabileceği bildirilir
+             binding.btnTestCoz.setVisibility(View.INVISIBLE);
+             binding.btnTestCozinvisible.setVisibility(View.VISIBLE);
+             binding.visibleacilama.setVisibility(View.VISIBLE);
+
+            // İsterseniz bu durumda kullanıcıyı ana ekrana yönlendirebilirsiniz
+        }
+
+        binding.bitkiphotoGor.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent intent= new Intent(Anasayfa.this, bitkiningorselinigor.class);
+                startActivity(intent);
+
+            }
+        });
+
+
+        binding.btnTestCoz.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (minterstitialAd !=null){
+                    minterstitialAd.show(Anasayfa.this);
+                    reklam();
+
+                }
+                System.out.println("reklam yuklendi");
+                binding.girisEkrani.setVisibility(View.INVISIBLE);
+                binding.soruEkrani.setVisibility(View.VISIBLE);
+                binding.sonucEkrani.setVisibility(View.INVISIBLE);
+
+                binding.sorularBtnBir.setOnClickListener(Anasayfa.this);
+                binding.sorularBtnIki.setOnClickListener(Anasayfa.this);
+                binding.sorularBtnUc.setOnClickListener(Anasayfa.this);
+
+
+
+
+                SoruGetir();
+
+
+
+
+            }
+        });
+
+
+
+
+
+    }
+    private void SoruGetir() {
+
+        if(sorulacak==toplamSoru){
+            TestBitir();
+            binding.girisEkrani.setVisibility(View.INVISIBLE);
+            binding.soruEkrani.setVisibility(View.INVISIBLE);
+            binding.sonucEkrani.setVisibility(View.VISIBLE);
+
+            binding.bitkisonucText.setText(""+puan+" questions correctly");
+
+            Animation slideInAnimation = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.slide_in);
+            binding.animasyonmusluk.setScaleX(-1f); // X ekseninde negatif ölçekleme yaparak yatay dönüşü gerçekleştirin
+            binding.animasyonmusluk.setVisibility(View.VISIBLE);
+            binding.animasyonmusluk.startAnimation(slideInAnimation);
+            binding.geridon.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if (minterstitialAd!=null){
+                        reklam();
+
+                    }
+                    binding.girisEkrani.setVisibility(View.VISIBLE);
+                    binding.soruEkrani.setVisibility(View.INVISIBLE);
+                    binding.sonucEkrani.setVisibility(View.INVISIBLE);
+
+                }
+            });
+
+            return;
+        }
+
+
+
+        binding.sorukactaneKaldi.setText(soru_sayisi + "/4");
+
+
+        String soru=SoruCevap.soru[sorulacak];
+        String soru1=SoruCevap.sorusecenek[sorulacak][0];
+
+        binding.sorularText.setText(soru);
+      binding.sorularBtnBir.setText(soru1);
+       binding.sorularBtnIki.setText(SoruCevap.sorusecenek[sorulacak][1]);
+       binding.sorularBtnUc.setText(SoruCevap.sorusecenek[sorulacak][2]);
+
+
+
+
+    }
+
+
+
+
+
+
+    private void TestBitir() {
+
+        veriokuma(puan);
+        saveLastLoginDate(currentDate);
+
+
+
+
+    }
+
+    private void Tekrarla() {
+        puan=0;
+        sorulacak=0;
+        SoruGetir();
+    }
+
+
+    @Override
+    public void onClick(View v) {
+        Button btnTiklanan=(Button) v;
+
+        btnTiklanan.setBackgroundColor(Color.WHITE);
+        btnCevapA.setBackgroundColor(Color.WHITE);
+        btnCevapB.setBackgroundColor(Color.WHITE);
+        btnCevapC.setBackgroundColor(Color.WHITE);
+
+
+
+        System.out.println("cevap önce :"+SoruCevap.cevaplar[sorulacak]);
+        secilenCevap=btnTiklanan.getText().toString();
+
+
+        if(sorulacak!=toplamSoru){
+            System.out.println("cevap :"+SoruCevap.cevaplar[sorulacak]);
+            System.out.println("secilen cevap :"+secilenCevap);
+            if(secilenCevap.equals(SoruCevap.cevaplar[sorulacak])){
+                System.out.println("cevap :"+SoruCevap.cevaplar[sorulacak]);
+                System.out.println("secilen cevap :"+secilenCevap);
+                puan++;
+                Toast.makeText(this, R.string.dogrucevap, Toast.LENGTH_SHORT).show();
+            }
+            else{
+                Toast.makeText(this,R.string.yanliscevap,Toast.LENGTH_SHORT).show();
+            }
+            sorulacak++;
+            soru_sayisi++;
+
+            SoruGetir();
+
+        }else{
+            //Seceneklerden biri tıklanmış demektir.
+            secilenCevap=btnTiklanan.getText().toString();
+            btnTiklanan.setBackgroundColor(Color.GREEN);
+
+        }
+    }
+
+    public void  firebaseverivazma(int deger){
+        ProgressDialog progressDialog = new ProgressDialog(this);
+        // Başlık
+        progressDialog.setTitle(R.string.tebrik);
+        progressDialog.setMessage("Bitki sulanıyor..."); // Mesaj
+        progressDialog.setCancelable(true); // Kullanıcının iptal etmesine izin verme
+        progressDialog.show();
+
+        System.out.println("1 .degerr yazılmadan önce :"+ deger);
+        deger=deger+gelenveridegeri;
+        System.out.println("2 .degerr yazılmadan önce :"+ deger);
+        DatabaseReference databaseReference = FirebaseDatabase.getInstance().getReference("bitkinem").child("bitkigelenveri");
+        System.out.println("3 .degerr yazılmadan önce :"+ deger);
+
+
+
+
+        System.out.println("sunucuy yazılacak deger:"+deger);
+
+
+
+        progressDialog.dismiss();
+
+    }
+
+    public void veriokuma(int deger) {
+        DatabaseReference databaseReference = FirebaseDatabase.getInstance().getReference("bitkinem/bitkigelenveri");
+
+        databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    // Eğer veri varsa, değeri al
+                   gelenveridegeri = snapshot.getValue(Integer.class);
+                    System.out.println("Bitkigelenveri: " + gelenveridegeri);
+                     int gonder = deger+gelenveridegeri;
+                    databaseReference.setValue(gonder);
+                } else {
+                    // Veri yoksa yapılacak işlemler
+                    System.out.println("Veri bulunamadı.");
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                // Hata durumunda yapılacak işlemler
+            }
+        });
+    }
+
+    public void toprakdegerinemi() {
+        DatabaseReference databaseReference = FirebaseDatabase.getInstance().getReference("bitkinem/topraknemi");
+
+        databaseReference.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    // Eğer veri varsa, değeri alabilirsiniz
+                    int topraknemi    = snapshot.getValue(Integer.class);
+                   int degisken=1023-topraknemi;
+                   binding.progressBar2.setProgress(degisken);
+                    System.out.println("Bitkigelenveri tprak nemi: " + topraknemi);
+                  if (0<degisken &&degisken<300){
+                      binding.progbardurumu.setText(R.string.kuru);
+
+                  }
+                  else if ( 301<degisken && degisken<800) {
+                          binding.progbardurumu.setText(R.string.orta);
+                    } else if (801<degisken  && degisken<1024) {
+                      binding.progbardurumu.setText(R.string.islak);
+
+                  }
+
+
+                } else {
+                    // Veri yoksa yapılacak işlemler
+                    System.out.println("Veri bulunamadı.");
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                // Hata durumunda yapılacak işlemler
+            }
+        });
+    }
+    private String getLastLoginDate() {
+        SharedPreferences sharedPreferences = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        return sharedPreferences.getString(KEY_LAST_LOGIN_DATE, "");
+    }
+
+    private void saveLastLoginDate(String currentDate) {
+        SharedPreferences sharedPreferences = getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putString(KEY_LAST_LOGIN_DATE, currentDate);
+        editor.apply();
+    }
+
+    private String getCurrentDate() {
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
+        return sdf.format(new Date());
+    }
+
+    private void performLoginActions() {
+        // Burada kullanıcı giriş işlemleri gerçekleştirilir
+
+
+    }
+    public void reklam(){
+        AdRequest adRequest= new AdRequest.Builder().build();
+        InterstitialAd.load(Anasayfa.this, "ca-app-pub-9753071382932184/2656516488", adRequest, new InterstitialAdLoadCallback() {
+            @Override
+            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
+                System.out.println("reklam yuklenemedi");
+                minterstitialAd=null;
+            }
+
+            @Override
+            public void onAdLoaded(@NonNull InterstitialAd interstitialAd) {
+                minterstitialAd=interstitialAd;
+            }
+        });
+
+
+    }
+
+    public void odullureklamyukleme(){
+        AdRequest adRequest= new AdRequest.Builder().build();
+        RewardedAd.load(Anasayfa.this, "ca-app-pub-9753071382932184/2312175205", adRequest, new RewardedAdLoadCallback() {
+            @Override
+            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
+                mrewardedAd=null;
+                Toast.makeText(Anasayfa.this, R.string.hatamesaji, Toast.LENGTH_SHORT).show();
+            }
+
+            @Override
+            public void onAdLoaded(@NonNull RewardedAd rewardedAd) {
+               mrewardedAd=rewardedAd;
+               mrewardedAd.setFullScreenContentCallback(new FullScreenContentCallback() {
+                   @Override
+                   public void onAdDismissedFullScreenContent() {
+                       odullureklamyukleme();
+                   }
+               });
+            }
+        });
+
+    }
+
+
+
+
+
+
+}
