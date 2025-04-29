@@ -1,0 +1,102 @@
+package com.demirkol.bitkideneyi;
+
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+
+import android.annotation.SuppressLint;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ProgressBar;
+import android.widget.TextView;
+import android.widget.Toast;
+
+public class Randomsorucoz extends AppCompatActivity {
+
+    TextView txtToplamSoru;
+    TextView txtSoru;
+    String kullanicicevabi,cevaplar;
+    EditText editText;
+    Button btnCevapA, btnCevapB, btnCevapC, btnCevapD;
+    Button btnGonder;
+    ProgressBar progressBar;
+    int puan = 0;
+    String kucukHarfMetin;
+    SoruCevap2 soruCevap;
+    int toplamSoru = 10;
+    int randomdeger=0;
+    int sorulacak = 0;
+    String secilenCevap = "";
+
+    @SuppressLint("MissingInflatedId")
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_randomsorucoz);
+
+        txtToplamSoru = findViewById(R.id.rondomsorukactane_kaldi);
+        txtSoru = findViewById(R.id.rondomsorular_text);
+        btnGonder = findViewById(R.id.rondombitir);
+        editText = findViewById(R.id.rondomedittext);
+      progressBar=findViewById(R.id.progressBarrandom);
+        soruCevap = new SoruCevap2(Randomsorucoz.this); // SoruCevap sınıfından bir örnek oluşturuldu
+
+        soruCevap.verilerial(); // verilerial() metodu çağrıldı
+
+        SoruGetir();
+    }
+
+    private void SoruGetir() {
+        if (sorulacak == toplamSoru) {
+            TestBitir();
+            return;
+        }
+        cevaplar=SoruCevap2.cevaplar[randomdeger];
+        System.out.println("cevap="+cevaplar);
+        txtSoru.setText(SoruCevap2.soru[randomdeger]);
+        System.out.println("soru="+SoruCevap2.soru[randomdeger]);
+
+        txtToplamSoru.setText((sorulacak+1)+"/10"); // txtToplamSoru'ya değer atama
+
+    }
+
+    private void TestBitir() {
+        String durum = "";
+        if (puan > toplamSoru * 0.6) {
+            durum = String.valueOf(R.string.tebrik);
+        } else {
+            durum = "Başarısız oldunuz.";
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(durum)
+                .setMessage(toplamSoru + " sorudan " + puan + " adet doğru cevap verdiniz.")
+                .setPositiveButton("Tekrar", ((dialog, which) -> Tekrarla()))
+                .setCancelable(false)
+                .show();
+    }
+
+    private void Tekrarla() {
+        puan = 0;
+        sorulacak = 0;
+        SoruGetir();
+    }
+
+    public void bitir(View v) {
+        kullanicicevabi = editText.getText().toString();
+        kucukHarfMetin = kullanicicevabi.toLowerCase();
+        if (kucukHarfMetin!=null && kucukHarfMetin.equals(cevaplar)) {
+            puan++;
+            Toast.makeText(this, R.string.dogrucevap, Toast.LENGTH_SHORT).show();
+        } else {
+            Toast.makeText(this, R.string.yanliscevap, Toast.LENGTH_SHORT).show();
+        }
+
+        progressBar.setProgress(sorulacak);
+        sorulacak++;
+        randomdeger++;
+        SoruGetir();
+    }
+}
